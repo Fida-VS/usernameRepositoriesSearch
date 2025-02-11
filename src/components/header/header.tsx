@@ -1,48 +1,71 @@
-import { useState, ChangeEvent, useEffect } from "react"
+import { useState, ChangeEvent, useEffect, useRef, useCallback } from "react";
 import { useAppDispatch } from "../../hook";
-import { addUserName, fetchRepos } from "../../store/repository-slice";
+import {
+  addUserName,
+  clearRepositories,
+  fetchRepos,
+} from "../../store/repository-slice";
 import { AppBar, Container, Toolbar } from "@mui/material";
 import { debounce } from "../../utils/debounce";
 
-
-
-
 export const Header: React.FC = () => {
+  const [searchValue, setSearchValue] = useState("");
+  const dispatch = useAppDispatch();
+  const abortControllerRef = useRef(new AbortController());
 
-    const [searchValue, setSearchValue] = useState('');
+  const onChangeHandler = (event: ChangeEvent<HTMLInputElement>) => {
+    setSearchValue(event.target.value);
+  };
 
-    
-    const dispatch = useAppDispatch();
+  const fetchData = useCallback(
+    (value: string) => {
+      // Прерываем предыдущий запрос
+      abortControllerRef.current.abort();
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
 
-    const onChangeHandler = (event: ChangeEvent<HTMLInputElement>) => setSearchValue(event.target.value);
+      if (value) {
+        dispatch(clearRepositories()); // Очищаем репозитории перед новым поиском
+        dispatch(addUserName(value));
+        dispatch(fetchRepos({ username: value, page: 1, signal })); 
+      }
+    },
+    [dispatch]
+  );
 
-    // Создание дебаунсированной функции  
-    const debouncedFetchRepos = debounce((value: string) => {  
-        if (value) {  
-            dispatch(fetchRepos({ username: value })); // Передаем объект  
-        }  
-    }, 1000);   
+  const debouncedFetchData = useRef(
+    debounce((value: string) => fetchData(value), 500)
+  ).current;
 
-    useEffect(() => {  
-        debouncedFetchRepos(searchValue); // Вызов дебаунсированной функции 
-        dispatch(addUserName(searchValue)); 
-    }, [searchValue, debouncedFetchRepos, dispatch]); // Зависимость: searchValue 
+  useEffect(() => {
+    debouncedFetchData(searchValue);
 
+    return () => {
+      // Прерываем запрос при размонтировании компонента
+      abortControllerRef.current.abort();
+    };
+  }, [searchValue, debouncedFetchData]);
 
-
-    return (
-        <AppBar sx={{ backgroundColor: '#005b8f' }} position="static">  
-  <Toolbar>  
-    <Container sx={{ padding: '20px', display: 'flex', justifyContent: 'center', flexGrow: 1 }}>  
-      <input  
-        className="searchInput"  
-        placeholder="Введите имя пользователя GitHub"  
-        value={searchValue}  
-        onChange={onChangeHandler}  
-        style={{ width: '100%', maxWidth: '500px' }} // Можно установить максимальную ширину для инпута  
-      />  
-    </Container>  
-  </Toolbar>  
-</AppBar>
-    )
-}
+  return (
+    <AppBar sx={{ backgroundColor: "#005b8f" }} position="static">
+      <Toolbar>
+        <Container
+          sx={{
+            padding: "20px",
+            display: "flex",
+            justifyContent: "center",
+            flexGrow: 1,
+          }}
+        >
+          <input
+            className="searchInput"
+            placeholder="Введите имя пользователя GitHub"
+            value={searchValue}
+            onChange={onChangeHandler}
+            style={{ width: "100%", maxWidth: "500px" }} 
+          />
+        </Container>
+      </Toolbar>
+    </AppBar>
+  );
+};
