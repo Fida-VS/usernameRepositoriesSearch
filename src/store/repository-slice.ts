@@ -102,7 +102,6 @@ const repositorySlice = createSlice({
       state.page = action.payload;
     },
     clearRepositories(state) {
-      // Новый reducer для сброса
       state.repositories = [];
       state.page = 1;
       state.noMoreRepos = false;
